@@ -114,6 +114,10 @@ Plus 20 labeling axioms for readable query output.
 
 5. **Compactness vs. performance is a real trade-off.** The original 20-symbol encoding with full absorption remains the pragmatic choice. Role-based encodings offer conceptual clarity at the cost of GCIs.
 
+## Conversation
+
+The full development conversation between Michael Wessel and Claude is available in [`conversation.md`](conversation.md). It documents every design decision, failed attempt, bug discovery, and fix in chronological order.
+
 ## Paper
 
 The full paper documenting this journey is available in [`paper/paper.pdf`](paper/paper.pdf) (LaTeX source in [`paper/paper.tex`](paper/paper.tex)).
