@@ -151,3 +151,19 @@ The original 2014 slides by Michael Wessel are in [`paper/original-slides.pdf`](
 - [RacerPro](https://github.com/ha-mo-we/Racer) Description Logic reasoner (or compatible KRSS reasoner)
 - Load any `.racer` file and check ABox consistency with `(abox-consistent?)`
 - Query solution with `(retrieve (?x (types ?x)) (?x state))`
+
+## RacerPorter Screenshots
+
+The encoding can be loaded and explored using [RacerPorter](https://github.com/ha-mo-we/Racer), the graphical frontend for RacerPro.
+
+### Loading the Knowledge Base
+
+![Loading the .racer file in RacerPorter](images/slide-racerporter-load-14.png)
+
+### Checking ABox Consistency
+
+![RacerPorter Shell -- ABox consistency check returns T](images/slide-racerporter-shell-15.png)
+
+### ABox Graph -- Exploring the Solution
+
+![RacerPorter ABox Graph showing states and their types](images/slide-racerporter-graph-16.png)
