@@ -1,0 +1,230 @@
+(full-reset)
+
+;; (define-primitive-role next :domain state :range state :feature t)
+
+(define-primitive-role next :feature t)
+
+(implies boat-a (all next boat-from-a-to-b))
+(implies boat-from-a-to-b (all next boat-b))
+(implies boat-b (all next boat-from-b-to-a))
+(implies boat-from-b-to-a (all next boat-a))
+
+;;;
+;;; only two fit in the boat
+;;; 
+
+(implies boat-from-a-to-b (and ferryman-boat-from-a-to-b
+			       
+			       ;; the ferryman may not go alone! 
+			       (or cabbage-boat-from-a-to-b
+				   wolf-boat-from-a-to-b
+				   goat-boat-from-a-to-b)
+			       
+			       (not (and cabbage-boat-from-a-to-b
+					 wolf-boat-from-a-to-b))
+			       
+			       (not (and cabbage-boat-from-a-to-b
+					 goat-boat-from-a-to-b))
+			       
+			       (not (and wolf-boat-from-a-to-b
+					 goat-boat-from-a-to-b))))				    
+
+(implies boat-from-b-to-a (and ferryman-boat-from-b-to-a
+			       			   	       
+			       (not (and cabbage-boat-from-b-to-a
+					 wolf-boat-from-b-to-a))
+			       
+			       (not (and cabbage-boat-from-b-to-a
+					 goat-boat-from-b-to-a))
+			       
+			       (not (and wolf-boat-from-b-to-a
+					 goat-boat-from-b-to-a))))
+
+;;;
+;;; no teleportation! 
+;;; 
+
+(implies goat-a (or (all next goat-a)
+		    (all next goat-boat-from-a-to-b)))
+
+(implies goat-boat-from-a-to-b (all next goat-b))
+
+(implies goat-b (or (all next goat-b)
+		    (all next goat-boat-from-b-to-a)))
+
+(implies goat-boat-from-b-to-a (all next goat-a))
+
+;;;
+;;;
+;;; 
+
+(implies wolf-a (or (all next wolf-a)
+		    (all next wolf-boat-from-a-to-b)))
+
+(implies wolf-boat-from-a-to-b (all next wolf-b))
+
+(implies wolf-b (or (all next wolf-b)
+		    (all next wolf-boat-from-b-to-a)))
+
+(implies wolf-boat-from-b-to-a (all next wolf-a))
+
+;;;
+;;;
+;;; 
+
+(implies cabbage-a (or (all next cabbage-a)
+		       (all next cabbage-boat-from-a-to-b)))
+
+(implies cabbage-boat-from-a-to-b (all next cabbage-b))
+
+(implies cabbage-b (or (all next cabbage-b)
+		       (all next cabbage-boat-from-b-to-a)))
+
+(implies cabbage-boat-from-b-to-a (all next cabbage-a))
+
+;;;
+;;;
+;;; 
+
+(implies ferryman-a (or (all next ferryman-a)
+			(all next ferryman-boat-from-a-to-b)))
+
+(implies ferryman-boat-from-a-to-b (all next ferryman-b))
+
+(implies ferryman-b (or (all next ferryman-b)
+			(all next ferryman-boat-from-b-to-a)))
+
+(implies ferryman-boat-from-b-to-a (all next ferryman-a))
+
+;;;
+;;; Make sure wolf and goat are not alone, and cabbage and goat are not alone 
+;;; 
+
+(implies (and wolf-a goat-a) ferryman-a)
+(implies (and wolf-b goat-b) ferryman-b)
+
+(implies (and cabbage-a goat-a) ferryman-a)
+(implies (and cabbage-b goat-b) ferryman-b)
+
+;;; 
+;;; every object can either be on side a, b, or on the boat heading
+;;; from a to b or from b to a
+;;; 
+
+(implies boat-a boat) 
+(implies boat-b boat) 
+(implies boat-from-a-to-b boat) 
+(implies boat-from-b-to-a boat) 
+
+;;;
+;;;
+;;;
+
+(implies goat-a goat)
+(implies goat-b goat)
+(implies goat-boat-from-a-to-b (and goat boat-from-a-to-b))
+(implies goat-boat-from-b-to-a (and goat boat-from-b-to-a))
+
+(implies wolf-a wolf)
+(implies wolf-b wolf)
+(implies wolf-boat-from-a-to-b (and wolf boat-from-a-to-b))
+(implies wolf-boat-from-b-to-a (and wolf boat-from-b-to-a))
+
+(implies cabbage-a cabbage) 
+(implies cabbage-b cabbage) 
+(implies cabbage-boat-from-a-to-b (and cabbage boat-from-a-to-b))
+(implies cabbage-boat-from-b-to-a (and cabbage boat-from-b-to-a))
+
+(implies ferryman-a ferryman) 
+(implies ferryman-b ferryman) 
+(implies ferryman-boat-from-a-to-b (and ferryman boat-from-a-to-b))
+(implies ferryman-boat-from-b-to-a (and ferryman boat-from-b-to-a))
+
+;;;
+;;; make sure that every object can only be at one location
+;;; 
+
+(disjoint boat-a boat-b boat-from-a-to-b boat-from-b-to-a)
+(disjoint goat-a goat-b goat-boat-from-a-to-b goat-boat-from-b-to-a)
+(disjoint wolf-a wolf-b wolf-boat-from-a-to-b wolf-boat-from-b-to-a)
+(disjoint cabbage-a cabbage-b cabbage-boat-from-a-to-b cabbage-boat-from-b-to-a)
+(disjoint ferryman-a ferryman-b ferryman-boat-from-a-to-b ferryman-boat-from-b-to-a)
+
+;;;
+;;; ensure every state has a description for locations 
+;;; of all objects
+;;; 
+
+
+;;;
+;;; make sure that objects don't disappear 
+;;; 
+
+(implies goat (or goat-a goat-b goat-boat-from-a-to-b goat-boat-from-b-to-a))
+
+(implies wolf (or wolf-a wolf-b wolf-boat-from-a-to-b wolf-boat-from-b-to-a))
+
+(implies cabbage (or cabbage-a cabbage-b cabbage-boat-from-a-to-b cabbage-boat-from-b-to-a))
+
+(implies ferryman (or ferryman-a ferryman-b ferryman-boat-from-a-to-b ferryman-boat-from-b-to-a))
+
+(implies boat (or boat-a boat-b boat-from-a-to-b boat-from-b-to-a))
+
+;;;
+;;;
+;;; 
+
+(implies state (and (or goal (some next state))
+		    goat wolf cabbage ferryman boat))
+
+
+;;;
+;;;
+;;;
+
+(implies start (and state boat-a goat-a wolf-a cabbage-a ferryman-a))
+
+(implies goal (and state boat-b goat-b wolf-b cabbage-b ferryman-b))
+
+;;;
+;;;
+;;; 
+
+(instance s1 start)
+
+(related s1 s2 next)
+
+(related s2 s3 next)
+
+(related s3 s4 next)
+
+(related s4 s5 next)
+
+(related s5 s6 next)
+
+(instance s6 (or ;;cabbage-boat-from-a-to-b
+		 wolf-boat-from-a-to-b
+		 ;;goat-boat-from-a-to-b
+		 ))
+
+(related s6 s7 next)
+
+(related s7 s8 next)
+
+(related s8 s9 next)
+
+(related s9 s10 next)
+
+(related s10 s11 next)
+
+(related s11 s12 next)
+
+(related s12 s13 next)
+
+(related s13 s14 next)
+
+(related s14 s15 next)
+
+(instance s15 goal)
+
+

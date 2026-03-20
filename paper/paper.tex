@@ -1,0 +1,597 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+%\usepackage{stmaryrd}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\geometry{margin=2.5cm}
+
+\lstdefinestyle{racer}{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries,
+  commentstyle=\color{gray}\itshape,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!5},
+  xleftmargin=1em,
+  framexleftmargin=0.5em,
+  columns=fullflexible,
+  literate={->}{$\rightarrow$}1
+}
+
+\newcommand{\DLsome}[2]{\exists #1.\,#2}
+\newcommand{\DLall}[2]{\forall #1.\,#2}
+\newcommand{\DLand}{\sqcap}
+\newcommand{\DLor}{\sqcup}
+\newcommand{\DLnot}{\neg}
+\newcommand{\DLsub}{\sqsubseteq}
+\newcommand{\DLbot}{\bot}
+\newcommand{\DLtop}{\top}
+\newcommand{\Racer}{\textsc{Racer}}
+\newcommand{\concept}[1]{\ensuremath{\mathsf{#1}}}
+\newcommand{\role}[1]{\ensuremath{\mathit{#1}}}
+
+\title{Using Standard Description Logic Reasoning\\for SAT Planning:\\
+Exploring Role-Based Encodings of the\\Wolf--Goat--Cabbage Riddle}
+
+\author{Michael Wessel \and Claude (Anthropic)}
+
+\date{March 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+SAT planning reduces planning problems to satisfiability tests: a plan
+of length~$n$ exists if and only if the conjunction of start state, goal
+state, and action axioms is satisfiable. The classical propositional
+encoding suffers from \emph{symbol proliferation}---every combination of
+object and location requires its own propositional variable. We
+investigate whether Description Logic (DL) roles can yield a more
+compact encoding, using the well-known Wolf--Goat--Cabbage river
+crossing puzzle as a case study. Starting from an existing encoding with
+atomic concept names in KRSS syntax for the \Racer{} reasoner, we
+systematically explore several role-based reformulations, documenting
+the trade-offs between symbol economy, reasoning performance, and
+semantic correctness.  Our journey reveals fundamental tensions between
+compactness and tableau efficiency in DL-based SAT planning.
+\end{abstract}
+
+%% ============================================================
+\section{Introduction}
+\label{sec:intro}
+%% ============================================================
+
+The Wolf--Goat--Cabbage (WGC) riddle is a classical river crossing
+puzzle: a ferryman must transport a wolf, a goat, and a cabbage across a
+river.  The boat holds at most the ferryman plus one object.  The wolf
+and goat cannot be left alone (the wolf eats the goat), nor can the goat
+and cabbage (the goat eats the cabbage).
+
+Following the SAT planning paradigm~\cite{kautz1992}, the problem can
+be encoded as a satisfiability test.  States are connected by a
+functional \role{next} relation; axioms constrain which successor states
+are legal.  A plan of length~$n$ exists iff the conjunction of axioms,
+start state, and goal state is satisfiable for a chain of $n$~states.
+
+Wessel~\cite{wessel2014} presented an encoding using the \Racer{}
+Description Logic reasoner, employing atomic concept names in KRSS
+syntax.  While effective, this encoding uses over 20 atomic concept names
+for object--location combinations (e.g., \concept{goat\text{-}a},
+\concept{wolf\text{-}boat\text{-}from\text{-}a\text{-}to\text{-}b}),
+exhibiting the symbol proliferation typical of propositional SAT
+encodings.
+
+In this paper, we explore whether DL \emph{roles} can provide a more
+compact representation, and document the challenges encountered along
+the way.
+
+%% ============================================================
+\section{The Original Encoding}
+\label{sec:original}
+%% ============================================================
+
+\subsection{Logical Signature}
+
+Each object (goat, wolf, cabbage, ferryman, boat) can be in one of four
+locations: riverbank~$A$, riverbank~$B$, in the boat going from~$A$
+to~$B$, or in the boat going from~$B$ to~$A$.  This yields four atomic
+concept names per object, for example:
+\[
+\concept{goat\text{-}a}, \quad
+\concept{goat\text{-}b}, \quad
+\concept{goat\text{-}boat\text{-}from\text{-}a\text{-}to\text{-}b}, \quad
+\concept{goat\text{-}boat\text{-}from\text{-}b\text{-}to\text{-}a}
+\]
+The role \role{next} is declared as a \emph{feature} (functional
+role), connecting each state to its unique successor.
+
+\subsection{Successor State Axioms}
+
+The boat cycles deterministically through the four locations:
+\[
+\concept{boat\text{-}a} \DLsub \DLall{\role{next}}{\concept{boat\text{-}from\text{-}a\text{-}to\text{-}b}}
+\]
+\[
+\concept{boat\text{-}from\text{-}a\text{-}to\text{-}b} \DLsub \DLall{\role{next}}{\concept{boat\text{-}b}}
+\]
+and so on.  In \Racer{} KRSS syntax:
+\begin{lstlisting}[style=racer]
+(implies boat-a (all next boat-from-a-to-b))
+(implies boat-from-a-to-b (all next boat-b))
+(implies boat-b (all next boat-from-b-to-a))
+(implies boat-from-b-to-a (all next boat-a))
+\end{lstlisting}
+
+\subsection{No-Teleportation Axioms}
+
+Objects can only move by boarding the boat. From a riverbank, an object
+either stays or boards:
+\[
+\concept{goat\text{-}a} \DLsub
+  \DLall{\role{next}}{\concept{goat\text{-}a}} \DLor
+  \DLall{\role{next}}{\concept{goat\text{-}boat\text{-}from\text{-}a\text{-}to\text{-}b}}
+\]
+From transit, it arrives at the opposite bank:
+\[
+\concept{goat\text{-}boat\text{-}from\text{-}a\text{-}to\text{-}b} \DLsub
+  \DLall{\role{next}}{\concept{goat\text{-}b}}
+\]
+The same pattern is repeated for wolf, cabbage, and ferryman (16~axioms total).
+
+\subsection{Boat Capacity, Safety, and Integrity}
+
+\textbf{Capacity:} When the boat travels from $A$ to~$B$, the ferryman
+is aboard, exactly one of \{wolf, goat, cabbage\} is aboard, and no two
+passengers ride together.  When returning from $B$ to~$A$, the ferryman
+may return alone.
+
+\textbf{Safety:} Wolf and goat, or cabbage and goat, on the same
+riverbank require the ferryman's presence:
+\[
+\concept{wolf\text{-}a} \DLand \concept{goat\text{-}a} \DLsub \concept{ferryman\text{-}a}
+\]
+
+\textbf{Disjointness:} Each object is at exactly one location:
+\begin{lstlisting}[style=racer]
+(disjoint goat-a goat-b goat-boat-from-a-to-b goat-boat-from-b-to-a)
+\end{lstlisting}
+
+\textbf{Persistence:} Objects do not disappear---every state specifies
+each object's location:
+\[
+\concept{goat} \DLsub
+  \concept{goat\text{-}a} \DLor \concept{goat\text{-}b} \DLor
+  \concept{goat\text{-}boat\text{-}from\text{-}a\text{-}to\text{-}b} \DLor
+  \concept{goat\text{-}boat\text{-}from\text{-}b\text{-}to\text{-}a}
+\]
+
+\textbf{Coupling:} An object on the boat implies the boat is in transit:
+\[
+\concept{goat\text{-}boat\text{-}from\text{-}a\text{-}to\text{-}b} \DLsub
+  \concept{goat} \DLand \concept{boat\text{-}from\text{-}a\text{-}to\text{-}b}
+\]
+
+\subsection{States, Start, and Goal}
+
+Every state either is a goal or has a successor, and specifies all objects:
+\[
+\concept{state} \DLsub
+  (\concept{goal} \DLor \DLsome{\role{next}}{\concept{state}}) \DLand
+  \concept{goat} \DLand \concept{wolf} \DLand \concept{cabbage} \DLand
+  \concept{ferryman} \DLand \concept{boat}
+\]
+\[
+\concept{start} \DLsub \concept{state} \DLand \concept{boat\text{-}a} \DLand
+  \concept{goat\text{-}a} \DLand \concept{wolf\text{-}a} \DLand
+  \concept{cabbage\text{-}a} \DLand \concept{ferryman\text{-}a}
+\]
+\[
+\concept{goal} \DLsub \concept{state} \DLand \concept{boat\text{-}b} \DLand
+  \concept{goat\text{-}b} \DLand \concept{wolf\text{-}b} \DLand
+  \concept{cabbage\text{-}b} \DLand \concept{ferryman\text{-}b}
+\]
+
+\subsection{Performance Characteristics}
+
+This encoding uses exclusively \emph{atomic concept names} on the
+left-hand side of GCIs (General Concept Inclusions), enabling effective
+\emph{absorption} by the tableau reasoner.  Absorbed GCIs are handled as
+lazy unfolding rules rather than global constraints checked against every
+individual---a significant performance advantage.
+
+The encoding works well in \Racer{}: ABox consistency checking completes
+quickly, and individual type retrieval yields the expected two solutions
+to the puzzle (corresponding to transporting the cabbage or the wolf
+after the initial goat crossing).
+
+The price is symbol proliferation: $5 \text{ objects} \times 4 \text{
+locations} = 20$ atomic concept names, plus 5 generic object concepts
+and supporting names.
+
+%% ============================================================
+\section{Attempt~1: Object-Centric Location Roles}
+\label{sec:attempt1}
+%% ============================================================
+
+\subsection{Idea}
+
+Replace the 20 atomic object--location concepts with 5 \emph{functional
+roles} (features) mapping states to locations, plus 4 shared location
+concepts:
+\begin{align*}
+\concept{goat\text{-}a} &\;\leadsto\; \DLsome{\role{goat\text{-}loc}}{\concept{a}} \\
+\concept{goat\text{-}b} &\;\leadsto\; \DLsome{\role{goat\text{-}loc}}{\concept{b}} \\
+\concept{goat\text{-}boat\text{-}from\text{-}a\text{-}to\text{-}b} &\;\leadsto\; \DLsome{\role{goat\text{-}loc}}{\concept{from\text{-}a\text{-}to\text{-}b}}
+\end{align*}
+
+The primitive vocabulary shrinks from 20+ symbols to 9 (5~roles +
+4~location concepts).  Disjointness of locations combined with
+functional roles gives per-object location uniqueness for free:
+
+\begin{lstlisting}[style=racer]
+(define-primitive-role goat-loc :feature t)
+(disjoint a b from-a-to-b from-b-to-a)
+\end{lstlisting}
+
+\subsection{Axiom Rewriting}
+
+All axioms are rewritten using role expressions.  For example, the boat
+cycle:
+\[
+\DLsome{\role{boat\text{-}loc}}{\concept{a}} \DLsub
+  \DLall{\role{next}}{\DLsome{\role{boat\text{-}loc}}{\concept{from\text{-}a\text{-}to\text{-}b}}}
+\]
+Coupling becomes:
+\[
+\DLsome{\role{goat\text{-}loc}}{\concept{from\text{-}a\text{-}to\text{-}b}} \DLsub
+  \DLsome{\role{boat\text{-}loc}}{\concept{from\text{-}a\text{-}to\text{-}b}}
+\]
+
+\subsection{Performance Problem}
+
+\textbf{This encoding was too slow for practical use.}  The root cause:
+every axiom with $\DLsome{\role{r}}{C}$ on the left-hand side is a
+\emph{General Concept Inclusion} (GCI) that cannot be absorbed into the
+concept hierarchy.  The original encoding had atomic concept names on the
+left---cheaply absorbed.  The role-based encoding has ${\sim}30$
+non-absorbable GCIs, each requiring global checking against every
+individual in the tableau.
+
+Additionally, the \texttt{:feature} declarations on all 5 location roles
+imposed expensive merge operations whenever the tableau created multiple
+fillers for the same role.
+
+%% ============================================================
+\section{Attempt~2: Defined Concept Abbreviations}
+\label{sec:attempt2}
+%% ============================================================
+
+\subsection{Idea}
+
+Introduce named concepts as abbreviations for the role expressions:
+\begin{lstlisting}[style=racer]
+(define-concept goat-at-a (some goat-loc a))
+(define-concept goat-at-b (some goat-loc b))
+;; ... 20 definitions total
+\end{lstlisting}
+Then use these names in axioms: \texttt{(implies goat-at-a (all next
+goat-at-a) ...)}. This gives the reasoner atomic-like concept names for
+internal optimization while preserving the role-based semantics.
+
+\subsection{Problem}
+
+\textbf{This reintroduces symbol proliferation.}  We now have 20 defined
+concept names---the same count as the original's 20 primitive concepts.
+While they are \emph{defined from} the 9-symbol role vocabulary rather
+than independently primitive, the practical effect is the same: 20
+names that the user must manage.  The compactness goal is defeated.
+
+%% ============================================================
+\section{Attempt~3: Dropping Features}
+\label{sec:attempt3}
+%% ============================================================
+
+\subsection{Idea}
+
+Remove the \texttt{:feature} declarations from the location roles to
+eliminate merge operations.  Use \texttt{(at-most 1 role)} in the state
+axiom instead---scoped to state individuals rather than globally
+declared:
+
+\begin{lstlisting}[style=racer]
+(define-primitive-role goat-loc)  ;; NOT a feature
+
+(implies state (and ...
+                    (at-most 1 goat-loc)
+                    (at-most 1 wolf-loc)
+                    ...))
+\end{lstlisting}
+
+\subsection{Problem}
+
+\textbf{Still too slow.}  The \texttt{(at-most~1)} restriction is
+semantically equivalent to a feature constraint---the reasoner must
+still track cardinality and perform merge operations.  The GCI
+bottleneck ($\DLsome{\role{r}}{C}$ on axiom left-hand sides) remains
+unchanged.  The \texttt{at-most} restrictions were subsequently removed
+entirely, relying on the axiom structure to naturally produce at most one
+filler per role (the tableau is lazy and only creates fillers when forced
+by existential restrictions).
+
+%% ============================================================
+\section{Attempt~4: Location-Centric Roles}
+\label{sec:attempt4}
+%% ============================================================
+
+\subsection{Idea}
+
+Invert the role perspective: instead of objects tracking their locations
+(\role{goat-loc}, \role{wolf-loc}, \ldots), locations track which
+objects are at them.  Use 4~roles (\role{at\text{-}a},
+\role{at\text{-}b}, \role{at\text{-}ab}, \role{at\text{-}ba}) and
+5~object concepts (\concept{goat}, \concept{wolf}, \concept{cabbage},
+\concept{ferryman}, \concept{boat}):
+
+\begin{align*}
+\concept{goat\text{-}a} &\;\leadsto\; \DLsome{\role{at\text{-}a}}{\concept{goat}} \\
+\concept{wolf\text{-}boat\text{-}from\text{-}a\text{-}to\text{-}b} &\;\leadsto\; \DLsome{\role{at\text{-}ab}}{\concept{wolf}}
+\end{align*}
+
+The symbol count is unchanged (9), but axioms that reference a single
+location now use a single role throughout.  For example, the safety
+constraint:
+\[
+\DLsome{\role{at\text{-}a}}{\concept{wolf}} \DLand
+\DLsome{\role{at\text{-}a}}{\concept{goat}} \DLsub
+\DLsome{\role{at\text{-}a}}{\concept{ferryman}}
+\]
+All three expressions reference the same role \role{at\text{-}a}, which
+may benefit the reasoner's internal indexing.
+
+\subsection{Open-World Semantics and \texttt{(all next ...)}}
+
+A subtle but important issue arose with the state axiom.  The original
+formulation used $\DLsome{\role{next}}{\concept{state}}$ to ensure
+non-goal states have a successor:
+\begin{lstlisting}[style=racer]
+(implies state (and (or goal (some next state)) ...))
+\end{lstlisting}
+
+Under open-domain semantics, $\DLsome{\role{next}}{\concept{state}}$
+does \emph{not} necessarily constrain the explicitly modeled successor
+(linked via \texttt{(related s1 s2 next)}).  The reasoner may create a
+fresh anonymous individual to satisfy the existential, leaving the
+asserted successor unconstrained.
+
+The fix: use $\DLall{\role{next}}{\cdot}$ to push object-persistence
+constraints to the modeled successor.  Since \role{next} is a feature,
+$\DLall{\role{next}}{C}$ applies to the unique successor.  Additionally,
+declaring \texttt{:domain state :range state} on the \role{next} role
+ensures that all individuals connected by \role{next} are classified as
+states:
+\begin{lstlisting}[style=racer]
+(define-primitive-role next :feature t :domain state :range state)
+
+(implies state (and (or goal (some next top))
+                    (all next (or (some at-a goat) ...))
+                    ...))
+\end{lstlisting}
+
+\subsection{The Uniqueness Problem}
+
+\textbf{Without uniqueness enforcement, the encoding is unsound.}
+
+The location-centric approach cannot use features on the \role{at-X}
+roles because multiple objects legitimately share a location (e.g.,
+wolf, cabbage, and ferryman can all be at riverbank~$A$).
+
+Without uniqueness constraints, the safety axioms become toothless.
+Consider state~$s_2$ where the boat departs from~$A$ with the ferryman.
+If the goat stays at~$A$ alongside the wolf, safety requires
+$\DLsome{\role{at\text{-}a}}{\concept{ferryman}}$.  Without uniqueness,
+the reasoner simply creates an \emph{additional}
+\role{at\text{-}a}~filler of type \concept{ferryman}---even though the
+ferryman is already on the boat
+($\DLsome{\role{at\text{-}ab}}{\concept{ferryman}}$).  The ferryman
+appears at two locations simultaneously, trivially satisfying the safety
+constraint.
+
+In the original encoding, this was prevented by:
+\begin{lstlisting}[style=racer]
+(disjoint ferryman-a ferryman-b
+          ferryman-boat-from-a-to-b ferryman-boat-from-b-to-a)
+\end{lstlisting}
+
+\subsection{Solution: Per-Object Location Exclusion Axioms}
+
+Since per-object uniqueness cannot be achieved via features or
+\texttt{disjoint} on atomic names (we don't have them), we add explicit
+exclusion axioms.  For each object and each location, being at that
+location excludes all others:
+\[
+\DLsome{\role{at\text{-}a}}{\concept{goat}} \DLsub
+  \DLnot\DLsome{\role{at\text{-}b}}{\concept{goat}} \DLand
+  \DLnot\DLsome{\role{at\text{-}ab}}{\concept{goat}} \DLand
+  \DLnot\DLsome{\role{at\text{-}ba}}{\concept{goat}}
+\]
+
+In \Racer{} syntax:
+\begin{lstlisting}[style=racer]
+(implies (some at-a goat)
+  (and (not (some at-b goat))
+       (not (some at-ab goat))
+       (not (some at-ba goat))))
+\end{lstlisting}
+
+This requires $5 \text{ objects} \times 4 \text{ locations} = 20$
+exclusion axioms---effectively re-encoding the original's disjointness
+declarations as GCIs.
+
+\subsection{Readable Labels}
+
+Since the role-based encoding produces types like
+$\DLsome{\role{at\text{-}a}}{\concept{goat}}$ rather than atomic names,
+ABox queries would not yield human-readable labels.  We add 20 labeling
+axioms that tag states with familiar names:
+\begin{lstlisting}[style=racer]
+(implies (some at-a goat) goat-a)
+(implies (some at-ab wolf) wolf-boat-from-a-to-b)
+;; ... etc.
+\end{lstlisting}
+
+These are cheap GCIs: the right-hand side is an atomic concept name (no
+fillers created, just tagging).
+
+\subsection{Final Encoding}
+
+The final, working encoding uses:
+\begin{itemize}[nosep]
+  \item 4 location roles: \role{at\text{-}a}, \role{at\text{-}b}, \role{at\text{-}ab}, \role{at\text{-}ba} (non-features)
+  \item 5 object concepts: \concept{goat}, \concept{wolf}, \concept{cabbage}, \concept{ferryman}, \concept{boat} (pairwise disjoint)
+  \item 1 functional role: \role{next} with domain/range \concept{state}
+  \item 20 per-object exclusion axioms for uniqueness
+  \item 20 labeling axioms for readable output
+  \item Standard axioms: boat cycle (4), capacity (2), no-teleportation (16), coupling (8), safety (4), state/start/goal (3)
+\end{itemize}
+
+The encoding produces correct results and runs at reasonable speed in \Racer{}.
+
+%% ============================================================
+\section{Discussion}
+\label{sec:discussion}
+%% ============================================================
+
+\subsection{Symbol Count Comparison}
+
+Table~\ref{tab:comparison} summarizes the primitive vocabulary of each
+approach.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Approach} & \textbf{Roles} & \textbf{Concepts} & \textbf{Total Primitives} & \textbf{GCIs} \\
+\midrule
+Original (atomic)        & 1 & 20+ & 21+ & 0 (all absorbed)\\
+Object-centric roles     & 6 & 4   & 10  & ${\sim}30$ \\
+Defined abbreviations    & 6 & 24  & 30  & ${\sim}30$ \\
+Location-centric (final) & 5 & 5   & 10  & ${\sim}50$ \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of encoding approaches. GCI count refers to
+non-absorbable axioms (complex concept on LHS).}
+\label{tab:comparison}
+\end{table}
+
+\subsection{The Compactness--Performance Trade-off}
+
+Our experiments reveal a fundamental tension:
+
+\begin{enumerate}[nosep]
+\item \textbf{Atomic concepts absorb; role expressions do not.}
+  Axioms of the form $A \DLsub C$ where $A$ is atomic are absorbed
+  into the concept hierarchy and handled as lazy unfolding.  Axioms
+  of the form $\DLsome{\role{r}}{C} \DLsub D$ are GCIs checked
+  globally against every tableau individual---far more expensive.
+
+\item \textbf{Features are expensive but necessary.}
+  Functional role declarations enable automatic per-object
+  uniqueness but impose merge operations.  Dropping features
+  requires explicit exclusion axioms (20 additional GCIs) to
+  maintain soundness.
+
+\item \textbf{Open-world semantics require care.}
+  The use of $\DLsome{\role{next}}{\concept{state}}$ in the state
+  axiom can lead to the creation of anonymous successor individuals
+  rather than constraining the explicitly asserted ones.  Using
+  $\DLall{\role{next}}{\cdot}$ with domain/range declarations
+  ensures constraints apply to the modeled plan states.
+
+\item \textbf{Location-centric roles cannot use features for
+  uniqueness.}
+  When multiple objects share a location role, features would
+  incorrectly limit the role to a single filler.  Per-object
+  uniqueness must be encoded separately.
+\end{enumerate}
+
+\subsection{Lessons Learned}
+
+The original encoding, despite its symbol proliferation, is
+well-matched to tableau-based DL reasoning.  Atomic concept names
+enable absorption, \texttt{disjoint} declarations are handled
+efficiently, and no GCIs are needed.
+
+The role-based encodings achieve greater \emph{ontological economy}
+(fewer primitive symbols), but at the cost of GCIs that the tableau must
+check globally.  The location-centric variant adds locality benefits
+(same-role references within safety and capacity axioms) and produces
+correct results at reasonable speed, but requires 20~exclusion axioms
+and 20~labeling axioms---totaling 40~additional axioms---that partially
+offset the compactness gains.
+
+The exercise demonstrates that in DL-based SAT planning, the choice of
+representation is not merely aesthetic: it has direct consequences for
+reasoning performance.  The ``right'' encoding depends on the reasoner's
+optimization strategies, particularly GCI absorption and feature
+handling.
+
+%% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+%% ============================================================
+
+We explored several role-based reformulations of a classical SAT
+planning problem in Description Logics, seeking to reduce symbol
+proliferation while maintaining reasoning efficiency.  Our journey
+through object-centric roles, defined abbreviations, feature
+elimination, and location-centric roles revealed that:
+
+\begin{itemize}[nosep]
+\item Compact role-based encodings are possible (9~primitive symbols
+  vs.\ 20+), but produce non-absorbable GCIs that slow tableau
+  reasoning.
+\item Uniqueness of object locations---trivially handled by
+  \texttt{disjoint} in the atomic encoding---requires either features
+  (expensive), cardinality restrictions (equally expensive), or
+  explicit exclusion axioms (verbose) in role-based encodings.
+\item Open-world semantics demand careful use of
+  $\DLall{\role{next}}{\cdot}$ rather than
+  $\DLsome{\role{next}}{\cdot}$ to ensure constraints apply to
+  explicitly modeled successor states.
+\item The final location-centric encoding with exclusion axioms
+  provides a working, reasonably fast alternative that demonstrates
+  the use of DL roles for structuring planning state descriptions.
+\end{itemize}
+
+The original atomic encoding remains the pragmatic choice for
+performance-critical applications.  However, the role-based approach
+offers conceptual clarity and extensibility---for instance, adding new
+objects or locations requires only new concept names, not a combinatorial
+explosion of new atomic symbols.
+
+\begin{thebibliography}{9}
+\bibitem{kautz1992}
+  H.~Kautz and B.~Selman,
+  ``Planning as Satisfiability,''
+  in \textit{Proc.\ ECAI}, 1992, pp.~359--363.
+
+\bibitem{wessel2014}
+  M.~Wessel,
+  ``SAT Planning in Description Logics: Solving the Classical Wolf Goat Cabbage Riddle,''
+  2014. Unpublished presentation.
+
+\bibitem{haarslev2007}
+  V.~Haarslev, R.~M{\"o}ller, and M.~Wessel,
+  ``\textsc{Racer}: An OWL Reasoning Agent for the Semantic Web,''
+  in \textit{Proc.\ Int.\ Workshop on Applications of Logic Programming to the Semantic Web}, 2007.
+\end{thebibliography}
+
+\end{document}

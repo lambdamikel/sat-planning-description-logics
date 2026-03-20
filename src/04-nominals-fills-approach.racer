@@ -1,0 +1,222 @@
+(full-reset)
+
+;;;
+;;; Wolf-Goat-Cabbage SAT Planning in Description Logics
+;;; COMPACT REPRESENTATION using DL roles + nominals (fills)
+;;;
+;;; Key idea: locations are ABox individuals (loc-a, loc-b, loc-ab, loc-ba),
+;;; not anonymous fillers. Uses (fills role individual) instead of
+;;; (some role concept), so the tableau never creates location individuals --
+;;; it just adds edges to pre-existing ones.
+;;;
+;;;   Original          =>  New
+;;;   goat-a            =>  (fills goat-loc loc-a)
+;;;   goat-b            =>  (fills goat-loc loc-b)
+;;;   goat-boat-from-a-to-b  =>  (fills goat-loc loc-ab)
+;;;   "wolf in boat a->b"    =>  (fills wolf-loc loc-ab)
+;;;
+;;; No features needed on location roles. Uniqueness enforced by
+;;; (at-most 1 role) + (different-from loc-a loc-b loc-ab loc-ba).
+;;;
+
+;;; ============================================================
+;;; Location individuals
+;;; ============================================================
+
+(instance loc-a a)
+(instance loc-b b)
+(instance loc-ab from-a-to-b)
+(instance loc-ba from-b-to-a)
+
+(different-from loc-a loc-b loc-ab loc-ba)
+
+;;; ============================================================
+;;; Roles -- NO features on location roles
+;;; ============================================================
+
+(define-primitive-role next :feature t)
+
+(define-primitive-role goat-loc)
+(define-primitive-role wolf-loc)
+(define-primitive-role cabbage-loc)
+(define-primitive-role ferryman-loc)
+(define-primitive-role boat-loc)
+
+;;; ============================================================
+;;; Boat successor state cycle
+;;; ============================================================
+
+(implies (fills boat-loc loc-a)  (all next (fills boat-loc loc-ab)))
+(implies (fills boat-loc loc-ab) (all next (fills boat-loc loc-b)))
+(implies (fills boat-loc loc-b)  (all next (fills boat-loc loc-ba)))
+(implies (fills boat-loc loc-ba) (all next (fills boat-loc loc-a)))
+
+;;; ============================================================
+;;; Boat capacity
+;;; ============================================================
+
+;;; A to B: ferryman aboard, exactly one of {cabbage, wolf, goat}
+
+(implies (fills boat-loc loc-ab)
+  (and (fills ferryman-loc loc-ab)
+       (or (fills cabbage-loc loc-ab)
+           (fills wolf-loc loc-ab)
+           (fills goat-loc loc-ab))
+       (not (and (fills cabbage-loc loc-ab)
+                 (fills wolf-loc loc-ab)))
+       (not (and (fills cabbage-loc loc-ab)
+                 (fills goat-loc loc-ab)))
+       (not (and (fills wolf-loc loc-ab)
+                 (fills goat-loc loc-ab)))))
+
+;;; B to A: ferryman aboard, at most one passenger (may return alone)
+
+(implies (fills boat-loc loc-ba)
+  (and (fills ferryman-loc loc-ba)
+       (not (and (fills cabbage-loc loc-ba)
+                 (fills wolf-loc loc-ba)))
+       (not (and (fills cabbage-loc loc-ba)
+                 (fills goat-loc loc-ba)))
+       (not (and (fills wolf-loc loc-ba)
+                 (fills goat-loc loc-ba)))))
+
+;;; ============================================================
+;;; No teleportation
+;;; ============================================================
+
+;;; Goat
+(implies (fills goat-loc loc-a)
+  (or (all next (fills goat-loc loc-a))
+      (all next (fills goat-loc loc-ab))))
+(implies (fills goat-loc loc-ab) (all next (fills goat-loc loc-b)))
+(implies (fills goat-loc loc-b)
+  (or (all next (fills goat-loc loc-b))
+      (all next (fills goat-loc loc-ba))))
+(implies (fills goat-loc loc-ba) (all next (fills goat-loc loc-a)))
+
+;;; Wolf
+(implies (fills wolf-loc loc-a)
+  (or (all next (fills wolf-loc loc-a))
+      (all next (fills wolf-loc loc-ab))))
+(implies (fills wolf-loc loc-ab) (all next (fills wolf-loc loc-b)))
+(implies (fills wolf-loc loc-b)
+  (or (all next (fills wolf-loc loc-b))
+      (all next (fills wolf-loc loc-ba))))
+(implies (fills wolf-loc loc-ba) (all next (fills wolf-loc loc-a)))
+
+;;; Cabbage
+(implies (fills cabbage-loc loc-a)
+  (or (all next (fills cabbage-loc loc-a))
+      (all next (fills cabbage-loc loc-ab))))
+(implies (fills cabbage-loc loc-ab) (all next (fills cabbage-loc loc-b)))
+(implies (fills cabbage-loc loc-b)
+  (or (all next (fills cabbage-loc loc-b))
+      (all next (fills cabbage-loc loc-ba))))
+(implies (fills cabbage-loc loc-ba) (all next (fills cabbage-loc loc-a)))
+
+;;; Ferryman
+(implies (fills ferryman-loc loc-a)
+  (or (all next (fills ferryman-loc loc-a))
+      (all next (fills ferryman-loc loc-ab))))
+(implies (fills ferryman-loc loc-ab) (all next (fills ferryman-loc loc-b)))
+(implies (fills ferryman-loc loc-b)
+  (or (all next (fills ferryman-loc loc-b))
+      (all next (fills ferryman-loc loc-ba))))
+(implies (fills ferryman-loc loc-ba) (all next (fills ferryman-loc loc-a)))
+
+;;; ============================================================
+;;; Coupling: object in transit => boat in transit same direction
+;;; ============================================================
+
+(implies (fills goat-loc loc-ab) (fills boat-loc loc-ab))
+(implies (fills goat-loc loc-ba) (fills boat-loc loc-ba))
+
+(implies (fills wolf-loc loc-ab) (fills boat-loc loc-ab))
+(implies (fills wolf-loc loc-ba) (fills boat-loc loc-ba))
+
+(implies (fills cabbage-loc loc-ab) (fills boat-loc loc-ab))
+(implies (fills cabbage-loc loc-ba) (fills boat-loc loc-ba))
+
+(implies (fills ferryman-loc loc-ab) (fills boat-loc loc-ab))
+(implies (fills ferryman-loc loc-ba) (fills boat-loc loc-ba))
+
+;;; ============================================================
+;;; Safety: wolf+goat and cabbage+goat need ferryman
+;;; ============================================================
+
+(implies (and (fills wolf-loc loc-a) (fills goat-loc loc-a)) (fills ferryman-loc loc-a))
+(implies (and (fills wolf-loc loc-b) (fills goat-loc loc-b)) (fills ferryman-loc loc-b))
+
+(implies (and (fills cabbage-loc loc-a) (fills goat-loc loc-a)) (fills ferryman-loc loc-a))
+(implies (and (fills cabbage-loc loc-b) (fills goat-loc loc-b)) (fills ferryman-loc loc-b))
+
+;;; ============================================================
+;;; State structure
+;;; Uniqueness via (at-most 1 role) -- no features needed.
+;;; Clash detection: merging two different-from location
+;;; individuals causes a clash, enforcing one location per object.
+;;; ============================================================
+
+(implies state (and (or goal (some next state))
+                    (at-most 1 goat-loc)
+                    (at-most 1 wolf-loc)
+                    (at-most 1 cabbage-loc)
+                    (at-most 1 ferryman-loc)
+                    (at-most 1 boat-loc)
+                    (or (fills goat-loc loc-a) (fills goat-loc loc-b)
+                        (fills goat-loc loc-ab) (fills goat-loc loc-ba))
+                    (or (fills wolf-loc loc-a) (fills wolf-loc loc-b)
+                        (fills wolf-loc loc-ab) (fills wolf-loc loc-ba))
+                    (or (fills cabbage-loc loc-a) (fills cabbage-loc loc-b)
+                        (fills cabbage-loc loc-ab) (fills cabbage-loc loc-ba))
+                    (or (fills ferryman-loc loc-a) (fills ferryman-loc loc-b)
+                        (fills ferryman-loc loc-ab) (fills ferryman-loc loc-ba))
+                    (or (fills boat-loc loc-a) (fills boat-loc loc-b)
+                        (fills boat-loc loc-ab) (fills boat-loc loc-ba))))
+
+;;; ============================================================
+;;; Start and Goal
+;;; ============================================================
+
+(implies start (and state
+                    (fills boat-loc loc-a)
+                    (fills goat-loc loc-a)
+                    (fills wolf-loc loc-a)
+                    (fills cabbage-loc loc-a)
+                    (fills ferryman-loc loc-a)))
+
+(implies goal (and state
+                   (fills boat-loc loc-b)
+                   (fills goat-loc loc-b)
+                   (fills wolf-loc loc-b)
+                   (fills cabbage-loc loc-b)
+                   (fills ferryman-loc loc-b)))
+
+;;; ============================================================
+;;; ABox: plan with 15 states + hints
+;;; ============================================================
+
+(instance s1 start)
+
+(related s1 s2 next)
+(related s2 s3 next)
+(related s3 s4 next)
+(related s4 s5 next)
+(related s5 s6 next)
+
+(instance s2 (fills goat-loc loc-ab))
+(instance s6 (fills wolf-loc loc-ab))
+
+(related s6 s7 next)
+(related s7 s8 next)
+(related s8 s9 next)
+(related s9 s10 next)
+(related s10 s11 next)
+(related s11 s12 next)
+(related s12 s13 next)
+(related s13 s14 next)
+(related s14 s15 next)
+
+(instance s10 (fills cabbage-loc loc-ab))
+
+(instance s15 goal)

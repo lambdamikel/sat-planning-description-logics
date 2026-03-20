@@ -1,0 +1,238 @@
+(full-reset)
+
+;;;
+;;; Wolf-Goat-Cabbage SAT Planning in Description Logics
+;;; COMPACT REPRESENTATION using DL roles for object locations
+;;;
+;;; Instead of proliferated symbols (goat-a, goat-b, goat-boat-from-a-to-b, ...),
+;;; we use per-object location roles (features) mapping states to locations.
+;;;   e.g., goat-a        becomes  (some goat-loc a)
+;;;         goat-b        becomes  (some goat-loc b)
+;;;         goat-boat-from-a-to-b  becomes  (some goat-loc from-a-to-b)
+;;;   "wolf is in the boat going from a to b" = (some wolf-loc from-a-to-b)
+;;;
+;;; Disjointness of locations + functional roles (features) gives us
+;;; per-object location uniqueness for free (no per-object disjoint axioms needed).
+;;;
+;;; For performance, we define named concept abbreviations for the
+;;; (some obj-loc place) expressions. This enables better GCI absorption
+;;; and internal optimization in the tableau reasoner, while preserving
+;;; the role-based semantics.
+;;;
+
+;;; ============================================================
+;;; Roles
+;;; ============================================================
+
+(define-primitive-role next :feature t)
+
+;;; Per-object location roles (features = functional, exactly one filler)
+(define-primitive-role goat-loc :feature t)
+(define-primitive-role wolf-loc :feature t)
+(define-primitive-role cabbage-loc :feature t)
+(define-primitive-role ferryman-loc :feature t)
+(define-primitive-role boat-loc :feature t)
+
+;;; ============================================================
+;;; Location concepts -- the four possible locations
+;;; ============================================================
+
+;;; a = riverbank A, b = riverbank B
+;;; from-a-to-b = in boat going A->B, from-b-to-a = in boat going B->A
+
+;;; Mutual exclusion: no individual can be at two locations
+(disjoint a b from-a-to-b from-b-to-a)
+
+;;; Transit locations (on the boat)
+(implies from-a-to-b in-transit)
+(implies from-b-to-a in-transit)
+
+;;; Location = union of all possible locations
+(define-concept location (or a b from-a-to-b from-b-to-a))
+
+;;; ============================================================
+;;; Named concept abbreviations for (some obj-loc place)
+;;; These are defined concepts (equivalences), giving the reasoner
+;;; atomic names to work with while preserving role-based semantics.
+;;; Since obj-loc roles are features and locations are disjoint,
+;;; the four concepts per object are automatically disjoint.
+;;; ============================================================
+
+;;; Boat location
+(define-concept boat-at-a (some boat-loc a))
+(define-concept boat-at-b (some boat-loc b))
+(define-concept boat-ab (some boat-loc from-a-to-b))
+(define-concept boat-ba (some boat-loc from-b-to-a))
+
+;;; Goat location
+(define-concept goat-at-a (some goat-loc a))
+(define-concept goat-at-b (some goat-loc b))
+(define-concept goat-ab (some goat-loc from-a-to-b))
+(define-concept goat-ba (some goat-loc from-b-to-a))
+
+;;; Wolf location
+(define-concept wolf-at-a (some wolf-loc a))
+(define-concept wolf-at-b (some wolf-loc b))
+(define-concept wolf-ab (some wolf-loc from-a-to-b))
+(define-concept wolf-ba (some wolf-loc from-b-to-a))
+
+;;; Cabbage location
+(define-concept cabbage-at-a (some cabbage-loc a))
+(define-concept cabbage-at-b (some cabbage-loc b))
+(define-concept cabbage-ab (some cabbage-loc from-a-to-b))
+(define-concept cabbage-ba (some cabbage-loc from-b-to-a))
+
+;;; Ferryman location
+(define-concept ferryman-at-a (some ferryman-loc a))
+(define-concept ferryman-at-b (some ferryman-loc b))
+(define-concept ferryman-ab (some ferryman-loc from-a-to-b))
+(define-concept ferryman-ba (some ferryman-loc from-b-to-a))
+
+;;; ============================================================
+;;; Boat successor state cycle: a -> from-a-to-b -> b -> from-b-to-a -> a
+;;; ============================================================
+
+(implies boat-at-a (all next boat-ab))
+(implies boat-ab (all next boat-at-b))
+(implies boat-at-b (all next boat-ba))
+(implies boat-ba (all next boat-at-a))
+
+;;; ============================================================
+;;; Boat capacity constraints
+;;; ============================================================
+
+;;; From A to B: ferryman must be aboard;
+;;; exactly one of {cabbage, wolf, goat} must be aboard (ferryman may not go alone!)
+
+(implies boat-ab
+  (and ferryman-ab
+
+       ;; at least one passenger
+       (or cabbage-ab wolf-ab goat-ab)
+
+       ;; at most one passenger (pairwise exclusion)
+       (not (and cabbage-ab wolf-ab))
+       (not (and cabbage-ab goat-ab))
+       (not (and wolf-ab goat-ab))))
+
+;;; From B to A: ferryman must be aboard; at most one passenger
+;;; (ferryman may return alone)
+
+(implies boat-ba
+  (and ferryman-ba
+       (not (and cabbage-ba wolf-ba))
+       (not (and cabbage-ba goat-ba))
+       (not (and wolf-ba goat-ba))))
+
+;;; ============================================================
+;;; No teleportation: objects move only by boarding the boat
+;;; From a bank, an object either stays or boards the boat.
+;;; From the boat (in transit), it arrives at the opposite bank.
+;;; ============================================================
+
+;;; Goat
+(implies goat-at-a (or (all next goat-at-a)
+                       (all next goat-ab)))
+(implies goat-ab (all next goat-at-b))
+(implies goat-at-b (or (all next goat-at-b)
+                       (all next goat-ba)))
+(implies goat-ba (all next goat-at-a))
+
+;;; Wolf
+(implies wolf-at-a (or (all next wolf-at-a)
+                       (all next wolf-ab)))
+(implies wolf-ab (all next wolf-at-b))
+(implies wolf-at-b (or (all next wolf-at-b)
+                       (all next wolf-ba)))
+(implies wolf-ba (all next wolf-at-a))
+
+;;; Cabbage
+(implies cabbage-at-a (or (all next cabbage-at-a)
+                          (all next cabbage-ab)))
+(implies cabbage-ab (all next cabbage-at-b))
+(implies cabbage-at-b (or (all next cabbage-at-b)
+                          (all next cabbage-ba)))
+(implies cabbage-ba (all next cabbage-at-a))
+
+;;; Ferryman
+(implies ferryman-at-a (or (all next ferryman-at-a)
+                           (all next ferryman-ab)))
+(implies ferryman-ab (all next ferryman-at-b))
+(implies ferryman-at-b (or (all next ferryman-at-b)
+                           (all next ferryman-ba)))
+(implies ferryman-ba (all next ferryman-at-a))
+
+;;; ============================================================
+;;; Coupling: if an object is in transit, the boat must be in
+;;; transit in the same direction
+;;; ============================================================
+
+(implies goat-ab boat-ab)
+(implies goat-ba boat-ba)
+
+(implies wolf-ab boat-ab)
+(implies wolf-ba boat-ba)
+
+(implies cabbage-ab boat-ab)
+(implies cabbage-ba boat-ba)
+
+(implies ferryman-ab boat-ab)
+(implies ferryman-ba boat-ba)
+
+;;; ============================================================
+;;; Safety: wolf+goat and cabbage+goat must not be left alone
+;;; (without the ferryman) on either bank
+;;; ============================================================
+
+(implies (and wolf-at-a goat-at-a) ferryman-at-a)
+(implies (and wolf-at-b goat-at-b) ferryman-at-b)
+
+(implies (and cabbage-at-a goat-at-a) ferryman-at-a)
+(implies (and cabbage-at-b goat-at-b) ferryman-at-b)
+
+;;; ============================================================
+;;; State structure: every state has all objects at some location,
+;;; and is either a goal or has a successor
+;;; ============================================================
+
+(implies state (and (or goal (some next state))
+                    (or goat-at-a goat-at-b goat-ab goat-ba)
+                    (or wolf-at-a wolf-at-b wolf-ab wolf-ba)
+                    (or cabbage-at-a cabbage-at-b cabbage-ab cabbage-ba)
+                    (or ferryman-at-a ferryman-at-b ferryman-ab ferryman-ba)
+                    (or boat-at-a boat-at-b boat-ab boat-ba)))
+
+;;; ============================================================
+;;; Start and Goal
+;;; ============================================================
+
+(implies start (and state boat-at-a goat-at-a wolf-at-a cabbage-at-a ferryman-at-a))
+
+(implies goal (and state boat-at-b goat-at-b wolf-at-b cabbage-at-b ferryman-at-b))
+
+;;; ============================================================
+;;; ABox: plan with 15 states
+;;; ============================================================
+
+(instance s1 start)
+
+(related s1 s2 next)
+(related s2 s3 next)
+(related s3 s4 next)
+(related s4 s5 next)
+(related s5 s6 next)
+
+;;; hint: at s6 the wolf is on the boat going from a to b
+(instance s6 wolf-ab)
+
+(related s6 s7 next)
+(related s7 s8 next)
+(related s8 s9 next)
+(related s9 s10 next)
+(related s10 s11 next)
+(related s11 s12 next)
+(related s12 s13 next)
+(related s13 s14 next)
+(related s14 s15 next)
+
+(instance s15 goal)

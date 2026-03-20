@@ -1,0 +1,268 @@
+(full-reset)
+
+;;;
+;;; Wolf-Goat-Cabbage SAT Planning in Description Logics
+;;; COMPACT REPRESENTATION -- location-centric roles
+;;;
+;;; Locations track which objects are "at" them (inverted perspective).
+;;; 4 roles (at-a, at-b, at-ab, at-ba) + 5 object concepts = 9 symbols.
+;;;
+;;;   Original               =>  New
+;;;   goat-a                 =>  (some at-a goat)
+;;;   goat-b                 =>  (some at-b goat)
+;;;   goat-boat-from-a-to-b  =>  (some at-ab goat)
+;;;   wolf-boat-from-a-to-b  =>  (some at-ab wolf)
+;;;     "wolf is in the boat going from a to b"
+;;;
+;;; Advantage: safety, capacity, and coupling axioms
+;;; all reference a single role per axiom.
+;;;
+
+;;; ============================================================
+;;; Roles -- no features on location roles
+;;; ============================================================
+
+(define-primitive-role next :feature t :domain state :range state)
+
+(define-primitive-role at-a)
+(define-primitive-role at-b)
+(define-primitive-role at-ab)
+(define-primitive-role at-ba)
+
+;;; Object type concepts
+(disjoint goat wolf cabbage ferryman boat)
+
+;;; ============================================================
+;;; Per-object location exclusion: each object at most one location
+;;; ============================================================
+
+;;; Goat
+(implies (some at-a goat)  (and (not (some at-b goat)) (not (some at-ab goat)) (not (some at-ba goat))))
+(implies (some at-b goat)  (and (not (some at-a goat)) (not (some at-ab goat)) (not (some at-ba goat))))
+(implies (some at-ab goat) (and (not (some at-a goat)) (not (some at-b goat))  (not (some at-ba goat))))
+(implies (some at-ba goat) (and (not (some at-a goat)) (not (some at-b goat))  (not (some at-ab goat))))
+
+;;; Wolf
+(implies (some at-a wolf)  (and (not (some at-b wolf)) (not (some at-ab wolf)) (not (some at-ba wolf))))
+(implies (some at-b wolf)  (and (not (some at-a wolf)) (not (some at-ab wolf)) (not (some at-ba wolf))))
+(implies (some at-ab wolf) (and (not (some at-a wolf)) (not (some at-b wolf))  (not (some at-ba wolf))))
+(implies (some at-ba wolf) (and (not (some at-a wolf)) (not (some at-b wolf))  (not (some at-ab wolf))))
+
+;;; Cabbage
+(implies (some at-a cabbage)  (and (not (some at-b cabbage)) (not (some at-ab cabbage)) (not (some at-ba cabbage))))
+(implies (some at-b cabbage)  (and (not (some at-a cabbage)) (not (some at-ab cabbage)) (not (some at-ba cabbage))))
+(implies (some at-ab cabbage) (and (not (some at-a cabbage)) (not (some at-b cabbage))  (not (some at-ba cabbage))))
+(implies (some at-ba cabbage) (and (not (some at-a cabbage)) (not (some at-b cabbage))  (not (some at-ab cabbage))))
+
+;;; Ferryman
+(implies (some at-a ferryman)  (and (not (some at-b ferryman)) (not (some at-ab ferryman)) (not (some at-ba ferryman))))
+(implies (some at-b ferryman)  (and (not (some at-a ferryman)) (not (some at-ab ferryman)) (not (some at-ba ferryman))))
+(implies (some at-ab ferryman) (and (not (some at-a ferryman)) (not (some at-b ferryman))  (not (some at-ba ferryman))))
+(implies (some at-ba ferryman) (and (not (some at-a ferryman)) (not (some at-b ferryman))  (not (some at-ab ferryman))))
+
+;;; Boat
+(implies (some at-a boat)  (and (not (some at-b boat)) (not (some at-ab boat)) (not (some at-ba boat))))
+(implies (some at-b boat)  (and (not (some at-a boat)) (not (some at-ab boat)) (not (some at-ba boat))))
+(implies (some at-ab boat) (and (not (some at-a boat)) (not (some at-b boat))  (not (some at-ba boat))))
+(implies (some at-ba boat) (and (not (some at-a boat)) (not (some at-b boat))  (not (some at-ab boat))))
+
+;;; ============================================================
+;;; Boat successor state cycle
+;;; ============================================================
+
+(implies (some at-a boat)  (all next (some at-ab boat)))
+(implies (some at-ab boat) (all next (some at-b boat)))
+(implies (some at-b boat)  (all next (some at-ba boat)))
+(implies (some at-ba boat) (all next (some at-a boat)))
+
+;;; ============================================================
+;;; Boat capacity
+;;; ============================================================
+
+;;; A to B: ferryman aboard, exactly one of {cabbage, wolf, goat}
+
+(implies (some at-ab boat)
+  (and (some at-ab ferryman)
+       (or (some at-ab cabbage)
+           (some at-ab wolf)
+           (some at-ab goat))
+       (not (and (some at-ab cabbage)
+                 (some at-ab wolf)))
+       (not (and (some at-ab cabbage)
+                 (some at-ab goat)))
+       (not (and (some at-ab wolf)
+                 (some at-ab goat)))))
+
+;;; B to A: ferryman aboard, at most one passenger
+
+(implies (some at-ba boat)
+  (and (some at-ba ferryman)
+       (not (and (some at-ba cabbage)
+                 (some at-ba wolf)))
+       (not (and (some at-ba cabbage)
+                 (some at-ba goat)))
+       (not (and (some at-ba wolf)
+                 (some at-ba goat)))))
+
+;;; ============================================================
+;;; No teleportation
+;;; ============================================================
+
+;;; Goat
+(implies (some at-a goat)
+  (or (all next (some at-a goat))
+      (all next (some at-ab goat))))
+(implies (some at-ab goat) (all next (some at-b goat)))
+(implies (some at-b goat)
+  (or (all next (some at-b goat))
+      (all next (some at-ba goat))))
+(implies (some at-ba goat) (all next (some at-a goat)))
+
+;;; Wolf
+(implies (some at-a wolf)
+  (or (all next (some at-a wolf))
+      (all next (some at-ab wolf))))
+(implies (some at-ab wolf) (all next (some at-b wolf)))
+(implies (some at-b wolf)
+  (or (all next (some at-b wolf))
+      (all next (some at-ba wolf))))
+(implies (some at-ba wolf) (all next (some at-a wolf)))
+
+;;; Cabbage
+(implies (some at-a cabbage)
+  (or (all next (some at-a cabbage))
+      (all next (some at-ab cabbage))))
+(implies (some at-ab cabbage) (all next (some at-b cabbage)))
+(implies (some at-b cabbage)
+  (or (all next (some at-b cabbage))
+      (all next (some at-ba cabbage))))
+(implies (some at-ba cabbage) (all next (some at-a cabbage)))
+
+;;; Ferryman
+(implies (some at-a ferryman)
+  (or (all next (some at-a ferryman))
+      (all next (some at-ab ferryman))))
+(implies (some at-ab ferryman) (all next (some at-b ferryman)))
+(implies (some at-b ferryman)
+  (or (all next (some at-b ferryman))
+      (all next (some at-ba ferryman))))
+(implies (some at-ba ferryman) (all next (some at-a ferryman)))
+
+;;; ============================================================
+;;; Coupling: object in transit => boat in transit same direction
+;;; (all use the same role per axiom)
+;;; ============================================================
+
+(implies (some at-ab goat) (some at-ab boat))
+(implies (some at-ba goat) (some at-ba boat))
+
+(implies (some at-ab wolf) (some at-ab boat))
+(implies (some at-ba wolf) (some at-ba boat))
+
+(implies (some at-ab cabbage) (some at-ab boat))
+(implies (some at-ba cabbage) (some at-ba boat))
+
+(implies (some at-ab ferryman) (some at-ab boat))
+(implies (some at-ba ferryman) (some at-ba boat))
+
+;;; ============================================================
+;;; Safety: wolf+goat and cabbage+goat need ferryman
+;;; (all references use the same role -- good for locality)
+;;; ============================================================
+
+(implies (and (some at-a wolf) (some at-a goat)) (some at-a ferryman))
+(implies (and (some at-b wolf) (some at-b goat)) (some at-b ferryman))
+
+(implies (and (some at-a cabbage) (some at-a goat)) (some at-a ferryman))
+(implies (and (some at-b cabbage) (some at-b goat)) (some at-b ferryman))
+
+;;; ============================================================
+;;; Readable labels for state queries
+;;; These are cheap: atomic RHS, no new fillers created.
+;;; ============================================================
+
+;;; Goat
+(implies (some at-a goat) goat-a)
+(implies (some at-b goat) goat-b)
+(implies (some at-ab goat) goat-boat-from-a-to-b)
+(implies (some at-ba goat) goat-boat-from-b-to-a)
+
+;;; Wolf
+(implies (some at-a wolf) wolf-a)
+(implies (some at-b wolf) wolf-b)
+(implies (some at-ab wolf) wolf-boat-from-a-to-b)
+(implies (some at-ba wolf) wolf-boat-from-b-to-a)
+
+;;; Cabbage
+(implies (some at-a cabbage) cabbage-a)
+(implies (some at-b cabbage) cabbage-b)
+(implies (some at-ab cabbage) cabbage-boat-from-a-to-b)
+(implies (some at-ba cabbage) cabbage-boat-from-b-to-a)
+
+;;; Ferryman
+(implies (some at-a ferryman) ferryman-a)
+(implies (some at-b ferryman) ferryman-b)
+(implies (some at-ab ferryman) ferryman-boat-from-a-to-b)
+(implies (some at-ba ferryman) ferryman-boat-from-b-to-a)
+
+;;; Boat
+(implies (some at-a boat) boat-a)
+(implies (some at-b boat) boat-b)
+(implies (some at-ab boat) boat-from-a-to-b)
+(implies (some at-ba boat) boat-from-b-to-a)
+
+;;; ============================================================
+;;; State structure
+;;; ============================================================
+
+(implies state (and (or goal (some next top))
+                    (all next (or (some at-a goat) (some at-b goat)
+                                  (some at-ab goat) (some at-ba goat)))
+                    (all next (or (some at-a wolf) (some at-b wolf)
+                                  (some at-ab wolf) (some at-ba wolf)))
+                    (all next (or (some at-a cabbage) (some at-b cabbage)
+                                  (some at-ab cabbage) (some at-ba cabbage)))
+                    (all next (or (some at-a ferryman) (some at-b ferryman)
+                                  (some at-ab ferryman) (some at-ba ferryman)))
+                    (all next (or (some at-a boat) (some at-b boat)
+                                  (some at-ab boat) (some at-ba boat)))))
+
+;;; ============================================================
+;;; Start and Goal
+;;; ============================================================
+
+(implies start (and state
+                    (some at-a boat)
+                    (some at-a goat)
+                    (some at-a wolf)
+                    (some at-a cabbage)
+                    (some at-a ferryman)))
+
+(implies goal (and state
+                   (some at-b boat)
+                   (some at-b goat)
+                   (some at-b wolf)
+                   (some at-b cabbage)
+                   (some at-b ferryman)))
+
+;;; ============================================================
+;;; ABox
+;;; ============================================================
+
+(instance s1 start)
+
+(related s1 s2 next)
+(related s2 s3 next)
+(related s3 s4 next)
+(related s4 s5 next)
+(related s5 s6 next)
+(related s6 s7 next)
+(related s7 s8 next)
+(related s8 s9 next)
+(related s9 s10 next)
+(related s10 s11 next)
+(related s11 s12 next)
+(related s12 s13 next)
+(related s13 s14 next)
+(related s14 s15 next)
+(instance s15 goal)

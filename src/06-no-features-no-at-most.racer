@@ -1,0 +1,206 @@
+(full-reset)
+
+;;;
+;;; Wolf-Goat-Cabbage SAT Planning in Description Logics
+;;; COMPACT REPRESENTATION using DL roles for object locations
+;;;
+;;;   Original               =>  New
+;;;   goat-a                 =>  (some goat-loc a)
+;;;   goat-b                 =>  (some goat-loc b)
+;;;   goat-boat-from-a-to-b  =>  (some goat-loc from-a-to-b)
+;;;   "wolf in boat a->b"   =>  (some wolf-loc from-a-to-b)
+;;;
+;;; No features on location roles.
+;;; Uniqueness via (at-most 1 role) + (disjoint a b from-a-to-b from-b-to-a).
+;;;
+
+;;; ============================================================
+;;; Roles
+;;; ============================================================
+
+(define-primitive-role next :feature t)
+
+(define-primitive-role goat-loc)
+(define-primitive-role wolf-loc)
+(define-primitive-role cabbage-loc)
+(define-primitive-role ferryman-loc)
+(define-primitive-role boat-loc)
+
+;;; ============================================================
+;;; Location concepts -- mutually exclusive
+;;; ============================================================
+
+(disjoint a b from-a-to-b from-b-to-a)
+
+;;; ============================================================
+;;; Boat successor state cycle
+;;; ============================================================
+
+(implies (some boat-loc a)          (all next (some boat-loc from-a-to-b)))
+(implies (some boat-loc from-a-to-b) (all next (some boat-loc b)))
+(implies (some boat-loc b)          (all next (some boat-loc from-b-to-a)))
+(implies (some boat-loc from-b-to-a) (all next (some boat-loc a)))
+
+;;; ============================================================
+;;; Boat capacity
+;;; ============================================================
+
+;;; A to B: ferryman aboard, exactly one passenger
+
+(implies (some boat-loc from-a-to-b)
+  (and (some ferryman-loc from-a-to-b)
+       (or (some cabbage-loc from-a-to-b)
+           (some wolf-loc from-a-to-b)
+           (some goat-loc from-a-to-b))
+       (not (and (some cabbage-loc from-a-to-b)
+                 (some wolf-loc from-a-to-b)))
+       (not (and (some cabbage-loc from-a-to-b)
+                 (some goat-loc from-a-to-b)))
+       (not (and (some wolf-loc from-a-to-b)
+                 (some goat-loc from-a-to-b)))))
+
+;;; B to A: ferryman aboard, at most one passenger
+
+(implies (some boat-loc from-b-to-a)
+  (and (some ferryman-loc from-b-to-a)
+       (not (and (some cabbage-loc from-b-to-a)
+                 (some wolf-loc from-b-to-a)))
+       (not (and (some cabbage-loc from-b-to-a)
+                 (some goat-loc from-b-to-a)))
+       (not (and (some wolf-loc from-b-to-a)
+                 (some goat-loc from-b-to-a)))))
+
+;;; ============================================================
+;;; No teleportation
+;;; ============================================================
+
+;;; Goat
+(implies (some goat-loc a)
+  (or (all next (some goat-loc a))
+      (all next (some goat-loc from-a-to-b))))
+(implies (some goat-loc from-a-to-b) (all next (some goat-loc b)))
+(implies (some goat-loc b)
+  (or (all next (some goat-loc b))
+      (all next (some goat-loc from-b-to-a))))
+(implies (some goat-loc from-b-to-a) (all next (some goat-loc a)))
+
+;;; Wolf
+(implies (some wolf-loc a)
+  (or (all next (some wolf-loc a))
+      (all next (some wolf-loc from-a-to-b))))
+(implies (some wolf-loc from-a-to-b) (all next (some wolf-loc b)))
+(implies (some wolf-loc b)
+  (or (all next (some wolf-loc b))
+      (all next (some wolf-loc from-b-to-a))))
+(implies (some wolf-loc from-b-to-a) (all next (some wolf-loc a)))
+
+;;; Cabbage
+(implies (some cabbage-loc a)
+  (or (all next (some cabbage-loc a))
+      (all next (some cabbage-loc from-a-to-b))))
+(implies (some cabbage-loc from-a-to-b) (all next (some cabbage-loc b)))
+(implies (some cabbage-loc b)
+  (or (all next (some cabbage-loc b))
+      (all next (some cabbage-loc from-b-to-a))))
+(implies (some cabbage-loc from-b-to-a) (all next (some cabbage-loc a)))
+
+;;; Ferryman
+(implies (some ferryman-loc a)
+  (or (all next (some ferryman-loc a))
+      (all next (some ferryman-loc from-a-to-b))))
+(implies (some ferryman-loc from-a-to-b) (all next (some ferryman-loc b)))
+(implies (some ferryman-loc b)
+  (or (all next (some ferryman-loc b))
+      (all next (some ferryman-loc from-b-to-a))))
+(implies (some ferryman-loc from-b-to-a) (all next (some ferryman-loc a)))
+
+;;; ============================================================
+;;; Coupling: object in transit => boat in transit same direction
+;;; ============================================================
+
+(implies (some goat-loc from-a-to-b) (some boat-loc from-a-to-b))
+(implies (some goat-loc from-b-to-a) (some boat-loc from-b-to-a))
+
+(implies (some wolf-loc from-a-to-b) (some boat-loc from-a-to-b))
+(implies (some wolf-loc from-b-to-a) (some boat-loc from-b-to-a))
+
+(implies (some cabbage-loc from-a-to-b) (some boat-loc from-a-to-b))
+(implies (some cabbage-loc from-b-to-a) (some boat-loc from-b-to-a))
+
+(implies (some ferryman-loc from-a-to-b) (some boat-loc from-a-to-b))
+(implies (some ferryman-loc from-b-to-a) (some boat-loc from-b-to-a))
+
+;;; ============================================================
+;;; Safety: wolf+goat and cabbage+goat need ferryman
+;;; ============================================================
+
+(implies (and (some wolf-loc a) (some goat-loc a)) (some ferryman-loc a))
+(implies (and (some wolf-loc b) (some goat-loc b)) (some ferryman-loc b))
+
+(implies (and (some cabbage-loc a) (some goat-loc a)) (some ferryman-loc a))
+(implies (and (some cabbage-loc b) (some goat-loc b)) (some ferryman-loc b))
+
+;;; ============================================================
+;;; State structure -- no features, no at-most restrictions
+;;; The axiom structure naturally produces one filler per role:
+;;; start creates one, no-teleportation propagates exactly one.
+;;; ============================================================
+
+(implies state (and (or goal (some next state))
+                    (or (some goat-loc a) (some goat-loc b)
+                        (some goat-loc from-a-to-b) (some goat-loc from-b-to-a))
+                    (or (some wolf-loc a) (some wolf-loc b)
+                        (some wolf-loc from-a-to-b) (some wolf-loc from-b-to-a))
+                    (or (some cabbage-loc a) (some cabbage-loc b)
+                        (some cabbage-loc from-a-to-b) (some cabbage-loc from-b-to-a))
+                    (or (some ferryman-loc a) (some ferryman-loc b)
+                        (some ferryman-loc from-a-to-b) (some ferryman-loc from-b-to-a))
+                    (or (some boat-loc a) (some boat-loc b)
+                        (some boat-loc from-a-to-b) (some boat-loc from-b-to-a))))
+
+;;; ============================================================
+;;; Start and Goal
+;;; ============================================================
+
+(implies start (and state
+                    (some boat-loc a)
+                    (some goat-loc a)
+                    (some wolf-loc a)
+                    (some cabbage-loc a)
+                    (some ferryman-loc a)))
+
+(implies goal (and state
+                   (some boat-loc b)
+                   (some goat-loc b)
+                   (some wolf-loc b)
+                   (some cabbage-loc b)
+                   (some ferryman-loc b)))
+
+;;; ============================================================
+;;; ABox
+;;; ============================================================
+
+(instance s1 start)
+
+(related s1 s2 next)
+(related s2 s3 next)
+(related s3 s4 next)
+(related s4 s5 next)
+(related s5 s6 next)
+
+(instance s2 (some goat-loc from-a-to-b))
+(instance s6 (some wolf-loc from-a-to-b))
+
+(related s6 s7 next)
+(related s7 s8 next)
+(related s8 s9 next)
+(related s9 s10 next)
+(related s10 s11 next)
+(related s11 s12 next)
+(related s12 s13 next)
+(related s13 s14 next)
+(related s14 s15 next)
+
+(instance s10 (some cabbage-loc from-a-to-b))
+
+(instance s15 goal)
