@@ -149,7 +149,7 @@ The original 2014 slides by Michael Wessel are in [`paper/original-slides.pdf`](
 ## Requirements
 
 - [RacerPro](https://github.com/ha-mo-we/Racer) Description Logic reasoner
-- [RacerPorter](https://github.com/lambdamikel/RacerPorter) graphical frontend for RacerPro -- the Windows executable under [`windows32`](https://github.com/lambdamikel/RacerPorter/tree/main/windows32) also contains the RacerPro executables that were used for this experiment
+- [RacerPorter](https://github.com/lambdamikel/RacerPorter) graphical frontend for RacerPro -- the Windows executable under [`windows32`](https://github.com/lambdamikel/RacerPorter/tree/main/racer_binaries/windows32/RacerPorter-2-0/lw) also contains the RacerPro executables that were used for this experiment
 - Load any `.racer` file and check ABox consistency with `(abox-consistent?)`
 - Query solution with `(retrieve (?x (types ?x)) (?x state))`
 
