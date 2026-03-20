@@ -8,7 +8,7 @@
 
 SAT planning reduces planning problems to satisfiability tests: a plan of length *n* exists if and only if the conjunction of start state, goal state, and action axioms is satisfiable. The classical propositional encoding suffers from *symbol proliferation* -- every combination of object and location requires its own propositional variable.
 
-This project investigates whether Description Logic (DL) roles can yield a more compact encoding, using the well-known **Wolf-Goat-Cabbage** river crossing puzzle as a case study. Starting from an existing encoding with atomic concept names in KRSS syntax for the [RacerPro](https://www.ifis.uni-luebeck.de/index.php?id=racer-project) reasoner, we systematically explore several role-based reformulations, documenting the trade-offs between symbol economy, reasoning performance, and semantic correctness.
+This project investigates whether Description Logic (DL) roles can yield a more compact encoding, using the well-known **Wolf-Goat-Cabbage** river crossing puzzle as a case study. Starting from an existing encoding with atomic concept names in KRSS syntax for the [RacerPro](https://github.com/ha-mo-we/Racer) reasoner, we systematically explore several role-based reformulations, documenting the trade-offs between symbol economy, reasoning performance, and semantic correctness.
 
 ## The Puzzle
 
@@ -148,6 +148,6 @@ The original 2014 slides by Michael Wessel are in [`paper/original-slides.pdf`](
 
 ## Requirements
 
-- [RacerPro](https://www.ifis.uni-luebeck.de/index.php?id=racer-project) Description Logic reasoner (or compatible KRSS reasoner)
+- [RacerPro](https://github.com/ha-mo-we/Racer) Description Logic reasoner (or compatible KRSS reasoner)
 - Load any `.racer` file and check ABox consistency with `(abox-consistent?)`
 - Query solution with `(retrieve (?x (types ?x)) (?x state))`
