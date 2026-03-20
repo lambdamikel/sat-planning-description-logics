@@ -17,6 +17,28 @@ A ferryman must transport a wolf, a goat, and a cabbage across a river:
 - The wolf and goat cannot be left alone (the wolf eats the goat)
 - The goat and cabbage cannot be left alone (the goat eats the cabbage)
 
+![The Wolf-Goat-Cabbage Riddle](images/slide-puzzle-02.png)
+
+## Encoding as SAT Planning in Description Logics
+
+States are connected by a functional `next` relation. Each object can be in one of four locations: riverbank A, riverbank B, on the boat going A to B, or on the boat going B to A. Axioms constrain which successor states are legal.
+
+![Logical Signature](images/slide-signature-04.png)
+
+![Successor State Axioms](images/slide-successor-06.png)
+
+![Further Axioms](images/slide-axioms-08.png)
+
+A solution is found by checking satisfiability of a chain of states from start to goal:
+
+![Verifying a Solution](images/slide-solution-10.png)
+
+The DL reasoner finds two possible solutions:
+
+![Two Possible Solutions](images/slide-two-solutions-12.png)
+
+![The Official Solution](images/slide-official-13.png)
+
 ## Approaches Explored
 
 Each approach is available as a Racer `.racer` file in the `src/` directory.
